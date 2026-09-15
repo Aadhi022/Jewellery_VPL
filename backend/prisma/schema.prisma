@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Material {
+  GOLD
+  SILVER
+  DIAMOND
+  PLATINUM
+  OTHER
+}
+
+enum ProductStatus {
+  AVAILABLE
+  SOLD
+  HIDDEN
+}
+
+enum PriceVisibility {
+  SHOW
+  ON_ENQUIRY
+  HIDDEN
+}
+
+enum EnquiryType {
+  PRODUCT
+  APPOINTMENT
+  GENERAL
+  PAWN_LOAN
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  FOLLOW_UP
+  CLOSED
+}
+
+enum Metal {
+  GOLD
+  SILVER
+  PLATINUM
+}
+
+enum CollectionStatus {
+  PUBLISHED
+  DRAFT
+  ARCHIVED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  rateUpdates  MetalRate[]
+  rateHistory  MetalRateHistory[]
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  productCode     String         @unique
+  name            String
+  slug            String         @unique
+  description     String?
+  material        Material
+  purity          String
+  weightGrams     Float
+  status          ProductStatus  @default(AVAILABLE)
+  featured        Boolean        @default(false)
+  estimatedValue  Float?
+  priceVisibility PriceVisibility @default(ON_ENQUIRY)
+  makingCharge    Float?
+  wastage         Float?
+  stoneCharge     Float?
+  certification   String?
+  caratWeight     Float?
+  cut             String?
+  clarity         String?
+  color           String?
+  tags            String[]
+  category        Category       @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  images          ProductImage[]
+  collections     CollectionProduct[]
+  enquiries       Enquiry[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  @@index([material])
+  @@index([categoryId])
+  @@index([status])
+  @@index([featured])
+  @@index([deletedAt])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  url       String
+  publicId  String
+  altText   String?
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  @@index([productId])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  imagePublicId String?
+  material    Material?
+  parent      Category? @relation("CategoryChildren", fields: [parentId], references: [id])
+  parentId    String?
+  children    Category[] @relation("CategoryChildren")
+  products    Product[]
+  sortOrder   Int       @default(0)
+  visible     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([parentId])
+  @@index([material])
+}
+
+model Collection {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  description   String?
+  heroImageUrl  String?
+  heroPublicId  String?
+  bannerImageUrl String?
+  bannerPublicId String?
+  featured      Boolean           @default(false)
+  status        CollectionStatus  @default(DRAFT)
+  sortOrder     Int               @default(0)
+  products      CollectionProduct[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([status])
+  @@index([featured])
+}
+
+model CollectionProduct {
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+  sortOrder    Int        @default(0)
+
+  @@id([collectionId, productId])
+}
+
+model MetalRate {
+  id          String   @id @default(cuid())
+  metal       Metal
+  purity      String
+  rate        Float
+  currency    String   @default("INR")
+  unit        String   @default("per gram")
+  updatedAt   DateTime @default(now()) @updatedAt
+  updatedBy   AdminUser @relation(fields: [updatedById], references: [id])
+  updatedById String
+  history     MetalRateHistory[]
+
+  @@unique([metal, purity])
+  @@index([metal])
+}
+
+model MetalRateHistory {
+  id           String    @id @default(cuid())
+  metalRate    MetalRate @relation(fields: [metalRateId], references: [id])
+  metalRateId  String
+  metal        Metal
+  purity       String
+  previousRate Float
+  newRate      Float
+  changedBy    AdminUser @relation(fields: [changedById], references: [id])
+  changedById  String
+  changedAt    DateTime  @default(now())
+
+  @@index([metalRateId])
+  @@index([changedAt])
+}
+
+model Enquiry {
+  id                 String       @id @default(cuid())
+  customerName       String
+  phone              String
+  email              String?
+  product            Product?     @relation(fields: [productId], references: [id])
+  productId          String?
+  productCode        String?
+  message            String
+  type               EnquiryType  @default(GENERAL)
+  status             EnquiryStatus @default(NEW)
+  notes              String?
+  preferredDate      String?
+  preferredTime      String?
+  jewelleryCategory  String?
+  consultationFormat String?
+  specialRequests    String?
+  weddingDate        String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model ShowroomSettings {
+  id               String  @id @default(cuid())
+  businessName     String  @default("[Your Jewellery Showroom]")
+  logoUrl          String?
+  logoPublicId     String?
+  phone            String  @default("")
+  whatsapp         String  @default("")
+  email            String?
+  address          String  @default("")
+  city             String  @default("")
+  state            String  @default("")
+  pincode          String  @default("")
+  googleMapsUrl    String?
+  googleMapsEmbed  String?
+  openingHours     Json    @default("[]")
+  socialLinks      Json    @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model BusinessSettings {
+  id                      String   @id @default(cuid())
+  announcementBar         String   @default("Welcome to our showroom")
+  announcementBarVisible  Boolean  @default(true)
+  certifications          Json     @default("[]")
+  savingsSchemeContent    String?
+  pawnLoanContent         String?
+  heroHeading             String   @default("Timeless Jewellery.")
+  heroSubheading          String   @default("Trusted Tradition.")
+  heroDescription         String   @default("Discover exquisite Gold, Silver and Diamond jewellery crafted for weddings, celebrations and generations.")
+  heroCTAPrimary          String   @default("Explore Jewellery")
+  heroCTASecondary        String   @default("Book an Appointment")
+  heroImageUrl            String?
+  heroImagePublicId       String?
+  footerTagline           String   @default("Crafted with love. Trusted for generations.")
+  metaTitle               String   @default("Premium Jewellery Showroom")
+  metaDescription         String   @default("Exquisite Gold, Silver and Diamond jewellery.")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
